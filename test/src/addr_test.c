@@ -82,8 +82,10 @@ static void check_one_iface_one_global_ipv4(char* ifname)
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
-	assert_int_equal(-1, iface->sd);
+	assert_int_equal(-1, iface->sd4);
+	assert_int_equal(-1, iface->sd6);
 	assert_null(iface->mdns);
+	assert_null(iface->mdns6);
 	assert_int_equal(1, iface->hostid);
 
 
@@ -183,8 +185,10 @@ static void check_one_iface_one_global_ipv6(char* ifname)
 	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
-	assert_int_equal(-1, iface->sd);
+	assert_int_equal(-1, iface->sd4);
+	assert_int_equal(-1, iface->sd6);
 	assert_null(iface->mdns);
+	assert_null(iface->mdns6);
 	assert_int_equal(1, iface->hostid);
 
 
@@ -359,8 +363,10 @@ static void check_one_iface_global_ipv4_ipv6(char* ifname)
 	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
-	assert_int_equal(-1, iface->sd);
+	assert_int_equal(-1, iface->sd4);
+	assert_int_equal(-1, iface->sd6);
 	assert_null(iface->mdns);
+	assert_null(iface->mdns6);
 	assert_int_equal(1, iface->hostid);
 
 
@@ -455,8 +461,10 @@ static void test_iface_init_two_ifc_ipv4_ll_global_ipv6_ipv4_ipv6(__attribute__(
 	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
-	assert_int_equal(-1, iface->sd);
+	assert_int_equal(-1, iface->sd4);
+	assert_int_equal(-1, iface->sd6);
 	assert_null(iface->mdns);
+	assert_null(iface->mdns6);
 	assert_int_equal(1, iface->hostid);
 
 
@@ -473,8 +481,10 @@ static void test_iface_init_two_ifc_ipv4_ll_global_ipv6_ipv4_ipv6(__attribute__(
 	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global_2.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
-	assert_int_equal(-1, iface->sd);
+	assert_int_equal(-1, iface->sd4);
+	assert_int_equal(-1, iface->sd6);
 	assert_null(iface->mdns);
+	assert_null(iface->mdns6);
 	assert_int_equal(1, iface->hostid);
 
 

@@ -68,9 +68,11 @@ struct iface {
 	struct in6_addr    in6addr;          /* == :: for non IP interfaces */
 	struct in6_addr    in6addr_old;
 
-	int                sd;
+	int                sd4;              /* Socket serving IPv4 */
+	int                sd6;              /* Socket serving IPv6 */
 
-	mdns_daemon_t     *mdns;
+	mdns_daemon_t     *mdns;             /* mdnsd instance serving the IPv6 domain */
+	mdns_daemon_t     *mdns6;            /* mdnsd instance serving the IPv6 domain */
 	int                hostid;           /* init to 1, +1 on conflict  */
 };
 

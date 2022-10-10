@@ -128,8 +128,13 @@ static void free_iface(struct iface *iface)
 {
 	mdnsd_shutdown(iface->mdns);
 	mdnsd_free(iface->mdns);
-	if (iface->sd >= 0)
-		close(iface->sd);
+	if (iface->sd4 >= 0)
+		close(iface->sd4);
+
+	mdnsd_shutdown(iface->mdns6);
+	mdnsd_free(iface->mdns6);
+	if (iface->sd6 >= 0)
+		close(iface->sd6);
 }
 
 static void setup_iface(struct iface *iface)
@@ -155,9 +160,9 @@ static void setup_iface(struct iface *iface)
 		mdnsd_register_receive_callback(iface->mdns, record_received, NULL);
 	}
 
-	if (iface->sd < 0) {
-		iface->sd = multicast_socket(iface, (unsigned char)ttl);
-		if (iface->sd < 0) {
+	if (iface->sd4 < 0) {
+		iface->sd4 = multicast_socket(iface, (unsigned char)ttl);
+		if (iface->sd4 < 0) {
 			ERR("Failed creating socket: %s", strerror(errno));
 			exit(1);
 		}
@@ -330,12 +335,12 @@ int main(int argc, char *argv[])
 
 		FD_ZERO(&fds);
 		for (iface = iface_iterator(1); iface; iface = iface_iterator(0)) {
-			if (iface->sd < 0 || iface->unused)
+			if (iface->sd4 < 0 || iface->unused)
 				continue;
 
-			FD_SET(iface->sd, &fds);
-			if (iface->sd > nfds)
-				nfds = iface->sd;
+			FD_SET(iface->sd4, &fds);
+			if (iface->sd4 > nfds)
+				nfds = iface->sd4;
 		}
 
 		if (nfds > 0)
@@ -367,10 +372,10 @@ int main(int argc, char *argv[])
 			struct timeval next;
 
 			DBG("Checking interface %s for activity ...", iface->ifname);
-			if (iface->unused || iface->sd < 0)
+			if (iface->unused || iface->sd4 < 0)
 				continue;
 
-			rc = mdnsd_step(iface->mdns, iface->sd, FD_ISSET(iface->sd, &fds), true, &next);
+			rc = mdnsd_step(iface->mdns, iface->sd4, FD_ISSET(iface->sd4, &fds), true, &next);
 			if (!rc) {
 				if (tv.tv_sec > next.tv_sec)
 					tv = next;

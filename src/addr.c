@@ -184,7 +184,8 @@ void iface_init(char *ifname)
 			strlcpy(iface->ifname, ifa->ifa_name, sizeof(iface->ifname));
 			iface->ifindex = if_nametoindex(ifa->ifa_name);
 			iface->hostid = 1;
-			iface->sd = -1;
+			iface->sd4 = -1;
+			iface->sd6 = -1;
 		} else {
 			iface->unused = 0;
 		}
