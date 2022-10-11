@@ -58,19 +58,6 @@ int   logging     = 1;
 int   ttl         = 255;
 
 
-/*
- * Create a multicast socket and bind it to the given interface.
- * Conclude by joining 224.0.0.251:5353 to hear others.
- */
-static int multicast_socket(struct iface *iface, unsigned char ttl)
-{
-	struct ifnfo ifa;
-	memcpy(ifa.ifname, iface->ifname, sizeof(ifa.ifname));
-	ifa.ifindex = iface->ifindex;
-	ifa.inaddr = iface->inaddr;
-	return mdns_ipv4_socket(&ifa, ttl);
-}
-
 void mdnsd_conflict(char *name, int type, void *arg)
 {
 	struct iface *iface = (struct iface *)arg;
@@ -137,6 +124,23 @@ static void free_iface(struct iface *iface)
 		close(iface->sd6);
 }
 
+
+/* Create a multicast socket and bind it to the given interface. */
+static int multicast_socket(struct iface *iface, int domain, unsigned char ttl)
+{
+	struct ifnfo ifa = { 0 };
+	memcpy(ifa.ifname, iface->ifname, sizeof(ifa.ifname));
+	ifa.ifindex = iface->ifindex;
+
+	if (domain == AF_INET6) {
+		return mdns_ipv6_socket(&ifa, ttl);
+	}
+
+	ifa.inaddr = iface->inaddr;
+	return mdns_ipv4_socket(&ifa, ttl);
+}
+
+
 static void setup_iface(struct iface *iface)
 {
 	if (!iface->changed)
@@ -147,29 +151,63 @@ static void setup_iface(struct iface *iface)
 		return;
 	}
 
-	if (!iface->mdns) {
-		iface->mdns = mdnsd_new(QCLASS_IN, 1000);
+	/* Set up IPv4 domain if it is active on the interface */
+	if (! is_zeronet(&iface->inaddr)) {
 		if (!iface->mdns) {
-			ERR("Failed creating mDNS context for interface %s: %s", iface->ifname, strerror(errno));
-			exit(1);
+			iface->mdns = mdnsd_new(QCLASS_IN, 1000);
+			if (!iface->mdns) {
+				ERR("Failed creating IPv4 mDNS context for interface %s: %s", iface->ifname, strerror(errno));
+				exit(1);
+			}
+
+			mdnsd_set_address(iface->mdns, iface->inaddr);
+			mdnsd_set_ipv6_address(iface->mdns, iface->in6addr);
+			conf_init(iface, iface->mdns, path, hostnm);
+			mdnsd_register_receive_callback(iface->mdns, record_received, NULL);
 		}
 
+		if (iface->sd4 < 0) {
+			iface->sd4 = multicast_socket(iface, AF_INET, (unsigned char)ttl);
+			if (iface->sd4 < 0) {
+				ERR("Failed creating IPv4 socket: %s", strerror(errno));
+				exit(1);
+			}
+		}
+	}
+
+
+	/* Set up IPv6 domain if it is active on the interface */
+	if (! IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr)) {
+		if (!iface->mdns6) {
+			iface->mdns6 = mdnsd_new(QCLASS_IN, 1000);
+			if (!iface->mdns6) {
+				ERR("Failed creating IPv6 mDNS context for interface %s: %s", iface->ifname, strerror(errno));
+				exit(1);
+			}
+
+			mdnsd_set_address(iface->mdns6, iface->inaddr);
+			mdnsd_set_ipv6_address(iface->mdns6, iface->in6addr);
+			conf_init(iface, iface->mdns6, path, hostnm);
+			mdnsd_register_receive_callback(iface->mdns6, record_received, NULL);
+		}
+
+		if (iface->sd6 < 0) {
+			iface->sd6 = multicast_socket(iface, AF_INET6, (unsigned char)ttl);
+			if (iface->sd6 < 0) {
+				ERR("Failed creating socket: %s", strerror(errno));
+				exit(1);
+			}
+		}
+	}
+
+	if (iface->mdns) {
 		mdnsd_set_address(iface->mdns, iface->inaddr);
 		mdnsd_set_ipv6_address(iface->mdns, iface->in6addr);
-		conf_init(iface, path, hostnm);
-		mdnsd_register_receive_callback(iface->mdns, record_received, NULL);
 	}
-
-	if (iface->sd4 < 0) {
-		iface->sd4 = multicast_socket(iface, (unsigned char)ttl);
-		if (iface->sd4 < 0) {
-			ERR("Failed creating socket: %s", strerror(errno));
-			exit(1);
-		}
+	if (iface->mdns6) {
+		mdnsd_set_address(iface->mdns6, iface->inaddr);
+		mdnsd_set_ipv6_address(iface->mdns6, iface->in6addr);
 	}
-
-	mdnsd_set_address(iface->mdns, iface->inaddr);
-	mdnsd_set_ipv6_address(iface->mdns, iface->in6addr);
 	iface->changed = 0;
 }
 
@@ -262,7 +300,7 @@ int main(int argc, char *argv[])
 	struct iface *iface;
 	fd_set fds;
 	int timeout = 0;
-	int c, rc;
+	int c, rc, rc6;
 
 	prognm = progname(argv[0]);
 	while ((c = getopt(argc, argv, "H:hi:l:nst:v?")) != EOF) {
@@ -335,12 +373,19 @@ int main(int argc, char *argv[])
 
 		FD_ZERO(&fds);
 		for (iface = iface_iterator(1); iface; iface = iface_iterator(0)) {
-			if (iface->sd4 < 0 || iface->unused)
+			if ((iface->sd4 < 0 && iface->sd6 < 0) || iface->unused)
 				continue;
 
-			FD_SET(iface->sd4, &fds);
-			if (iface->sd4 > nfds)
-				nfds = iface->sd4;
+			if (iface->sd4 >= 0) {
+				FD_SET(iface->sd4, &fds);
+				if (iface->sd4 > nfds)
+					nfds = iface->sd4;
+			}
+			if (iface->sd6 >= 0) {
+				FD_SET(iface->sd6, &fds);
+				if (iface->sd6 > nfds)
+					nfds = iface->sd6;
+			}
 		}
 
 		if (nfds > 0)
@@ -354,8 +399,14 @@ int main(int argc, char *argv[])
 			if (reload) {
 				sys_init();
 				for (iface = iface_iterator(1); iface; iface = iface_iterator(0)) {
-					records_clear(iface->mdns);
-					conf_init(iface, path, hostnm);
+					if (iface->mdns) {
+						records_clear(iface->mdns);
+						conf_init(iface, iface->mdns, path, hostnm);
+					}
+					if (iface->mdns6) {
+						records_clear(iface->mdns6);
+						conf_init(iface, iface->mdns6, path, hostnm);
+					}
 				}
 				pidfile(PACKAGE_NAME);
 				reload = 0;
@@ -371,21 +422,43 @@ int main(int argc, char *argv[])
 		for (iface = iface_iterator(1); iface; iface = iface_iterator(0)) {
 			struct timeval next;
 
-			DBG("Checking interface %s for activity ...", iface->ifname);
-			if (iface->unused || iface->sd4 < 0)
+			if (iface->unused)
 				continue;
 
-			rc = mdnsd_step(iface->mdns, iface->sd4, FD_ISSET(iface->sd4, &fds), true, &next);
-			if (!rc) {
-				if (tv.tv_sec > next.tv_sec)
-					tv = next;
-				continue;
+			rc = rc6 = 0;
+			if (iface->mdns && iface->sd4 >= 0) {
+				DBG("Checking interface %s for IPv4 activity ...", iface->ifname);
+
+				rc = mdnsd_step(iface->mdns, iface->sd4, FD_ISSET(iface->sd4, &fds), true, &next);
+				if (!rc) {
+					if (tv.tv_sec > next.tv_sec)
+						tv = next;
+				}
+
+				if (rc == 1)
+					ERR("Failed reading from IPv4 socket %d: %s", errno, strerror(errno));
+				if (rc == 2)
+					ERR("Failed writing to IPv4 socket: %s", strerror(errno));
 			}
 
-			if (rc == 1)
-				ERR("Failed reading from socket %d: %s", errno, strerror(errno));
-			if (rc == 2)
-				ERR("Failed writing to socket: %s", strerror(errno));
+			if (iface->mdns6 && iface->sd6 >= 0) {
+				DBG("Checking interface %s for IPv6 activity ...", iface->ifname);
+
+				rc6 = mdnsd_step(iface->mdns6, iface->sd6, FD_ISSET(iface->sd6, &fds), true, &next);
+				if (!rc6) {
+					if (tv.tv_sec > next.tv_sec)
+						tv = next;
+				}
+
+				if (rc6 == 1)
+					ERR("Failed reading from IPv6 socket %d: %s", errno, strerror(errno));
+				if (rc6 == 2)
+					ERR("Failed writing to IPv6 socket: %s", strerror(errno));
+			}
+
+
+			if (!rc || !rc6)  /* Continue as long as one socket can successfully send/receive */
+				continue;
 
 			free_iface(iface);
 		}

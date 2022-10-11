@@ -131,10 +131,9 @@ static int parse(char *fn, struct conf_srec *srec)
 }
 
 /* Create a new record, or update an existing one */
-mdns_record_t *record(struct iface *iface, int shared, char *host,
+mdns_record_t *record(struct iface *iface, mdns_daemon_t *d, int shared, char *host,
 		      const char *name, unsigned short type, unsigned long ttl)
 {
-	mdns_daemon_t *d = iface->mdns;
 	mdns_record_t *r;
 
 	r = mdnsd_find(d, name, type);
@@ -171,9 +170,8 @@ mdns_record_t *record(struct iface *iface, int shared, char *host,
 	return r;
 }
 
-static int load(struct iface *iface, char *path, char *hostname)
+static int load(struct iface *iface, mdns_daemon_t *d, char *path, char *hostname)
 {
-	mdns_daemon_t *d = iface->mdns;
 	struct conf_srec srec;
 	unsigned char *packet;
 	mdns_record_t *r;
@@ -200,29 +198,29 @@ static int load(struct iface *iface, char *path, char *hostname)
 		srec.target = strdup(hlocal);
 
 	/* Announce that we have a $type service */
-	record(iface, 1, tlocal, DISCO_NAME, QTYPE_PTR, 120);
-	record(iface, 1, srec.target, tlocal, QTYPE_PTR, 120);
+	record(iface, d, 1, tlocal, DISCO_NAME, QTYPE_PTR, 120);
+	record(iface, d, 1, srec.target, tlocal, QTYPE_PTR, 120);
 
-	r = record(iface, 0, NULL, hlocal, QTYPE_SRV, 120);
+	r = record(iface, d, 0, NULL, hlocal, QTYPE_SRV, 120);
 	mdnsd_set_srv(d, r, 0, 0, srec.port, nlocal);
 
 	/* If an IPv4 address is already set, add an A record for it. */
 	struct in_addr ipv4addr = mdnsd_get_address(d);
 	if (ipv4addr.s_addr != 0) {
-		r = record(iface, 0, NULL, nlocal, QTYPE_A, 120);
+		r = record(iface, d, 0, NULL, nlocal, QTYPE_A, 120);
 		mdnsd_set_ip(d, r, ipv4addr);
 	}
 
 	/* If an IPv6 address is already set, add an AAAA record for it. */
 	struct in6_addr ipv6addr = mdnsd_get_ipv6_address(d);
 	if (!IN6_IS_ADDR_UNSPECIFIED(&ipv6addr)) {
-		r = record(iface, 0, NULL, nlocal, QTYPE_AAAA, 120);
+		r = record(iface, d, 0, NULL, nlocal, QTYPE_AAAA, 120);
 		mdnsd_set_ipv6(d, r, ipv6addr);
 	}
 
 	if (srec.cname)
-		record(iface, 1, srec.cname, nlocal, QTYPE_CNAME, 120);
-	r = record(iface, 0, NULL, hlocal, QTYPE_TXT, 4500);
+		record(iface, d, 1, srec.cname, nlocal, QTYPE_CNAME, 120);
+	r = record(iface, d, 0, NULL, hlocal, QTYPE_TXT, 4500);
 
 	h = xht_new(11);
 	for (i = 0; i < srec.txt_num; i++) {
@@ -250,7 +248,7 @@ static int load(struct iface *iface, char *path, char *hostname)
 	return 0;
 }
 
-int conf_init(struct iface *iface, char *path, char *hostnm)
+int conf_init(struct iface *iface, mdns_daemon_t *d, char *path, char *hostnm)
 {
 	char hostname[HOST_NAME_MAX];
 	int hostid = iface->hostid;
@@ -319,11 +317,11 @@ int conf_init(struct iface *iface, char *path, char *hostnm)
 		}
 
 		for (i = 0; i < gl.gl_pathc; i++)
-			rc |= load(iface, gl.gl_pathv[i], hostname);
+			rc |= load(iface, d, gl.gl_pathv[i], hostname);
 
 		globfree(&gl);
 	} else
-		rc |= load(iface, path, hostname);
+		rc |= load(iface, d, path, hostname);
 
 	return rc;
 }
