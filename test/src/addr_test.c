@@ -40,8 +40,10 @@ struct sockaddr_in6 ipv6_link_local   = { AF_INET6, 0, 0,
 	{ 0xfe,0x80, 0x11,0xac, 0xb0,0x0b, 0x52,0x01, 0x00,0x00, 0x00,0x00, 0xca,0xfe, 0xba,0xbe}, 0 };
 struct sockaddr_in6 ipv6_FF           = { AF_INET6, 0, 0,
 	{ 0xff,0xff, 0xff,0xff, 0xff,0xff, 0xff,0xff, 0x00,0x00, 0x00,0x00, 0x00,0x00, 0x00,0x00}, 0 };
-struct sockaddr_in6 ipv6_global_2      = { AF_INET6, 0, 0,
+struct sockaddr_in6 ipv6_global_2     = { AF_INET6, 0, 0,
 	{ 0x20,0x01, 0x0d,0xb8, 0x00,0x00, 0xfe,0x02, 0x00,0x00, 0x00,0x00, 0xde,0xad, 0xc0,0xce}, 0 };
+struct sockaddr_in6 ipv6_link_local_2 = { AF_INET6, 0, 0,
+	{ 0xfe,0x80, 0x11,0xac, 0xb0,0xb0, 0x52,0x02, 0x00,0x00, 0x00,0x00, 0xca,0xfe, 0xba,0xbe}, 0 };
 
 
 
@@ -170,7 +172,7 @@ static void test_iface_init_one_ifc_LL_ipv4_global_ipv4(__attribute__((__unused_
 
 
 /* Helper function testing that one IPv6 is set on one interface. */
-static void check_one_iface_one_global_ipv6(char* ifname)
+static void check_one_iface_one_link_local_ipv6(char* ifname)
 {
 	struct iface *iface = iface_iterator(1);
 	assert_non_null(iface);
@@ -182,7 +184,7 @@ static void check_one_iface_one_global_ipv6(char* ifname)
 
 	assert_int_equal(0x00000000, iface->inaddr.s_addr);
 	assert_int_equal(0x00000000, iface->inaddr_old.s_addr);
-	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global.sin6_addr, &iface->in6addr));
+	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_link_local.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
 	assert_int_equal(-1, iface->sd4);
@@ -204,7 +206,7 @@ static void test_iface_init_one_ifc_ipv6(__attribute__((__unused__)) void **stat
 	struct ifaddrs addrs = {
 		NULL,
 		"if0c1ip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
-		(struct sockaddr*)&ipv6_global, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		(struct sockaddr*)&ipv6_link_local, (struct sockaddr*)&ipv6_FF, NULL, NULL
 	};
 
 	will_return(__wrap_getifaddrs, &addrs);
@@ -212,11 +214,11 @@ static void test_iface_init_one_ifc_ipv6(__attribute__((__unused__)) void **stat
 
 	iface_init(NULL);
 
-	check_one_iface_one_global_ipv6(addrs.ifa_name);
+	check_one_iface_one_link_local_ipv6(addrs.ifa_name);
 }
 
 /*
- * Test that a global IPv6 address is not overwritten with a link local one.
+ * Test that a global IPv6 address is overwritten by a link local one.
  * One interface, only IPv6.
  */
 static void test_iface_init_one_ifc_global_ipv6_LL_ipv6(__attribute__((__unused__)) void **state)
@@ -239,11 +241,11 @@ static void test_iface_init_one_ifc_global_ipv6_LL_ipv6(__attribute__((__unused_
 
 	iface_init(NULL);
 
-	check_one_iface_one_global_ipv6(addrs->ifa_name);
+	check_one_iface_one_link_local_ipv6(addrs->ifa_name);
 }
 
 /*
- * Test that a link local IPv6 address is overwritten by a global one.
+ * Test that a link local IPv6 address is not overwritten with a global one.
  * One interface, only IPv6.
  */
 static void test_iface_init_one_ifc_LL_ipv6_global_ipv6(__attribute__((__unused__)) void **state)
@@ -266,12 +268,12 @@ static void test_iface_init_one_ifc_LL_ipv6_global_ipv6(__attribute__((__unused_
 
 	iface_init(NULL);
 
-	check_one_iface_one_global_ipv6(addrs->ifa_name);
+	check_one_iface_one_link_local_ipv6(addrs->ifa_name);
 }
 
 /*
- * Test that IPv6 addresses of lower preference get overwritten by addresses with higher one.
- * null < link local < site local < unique local < global
+ * Test that IPv6 addresses of higher preference do not get overwritten by addresses with lower one.
+ * null < global < unique local < site local < link local
  * One interface, only IPv6.
  */
 static void test_iface_init_one_ifc_LL_SL_UL_global_ipv6(__attribute__((__unused__)) void **state)
@@ -304,12 +306,12 @@ static void test_iface_init_one_ifc_LL_SL_UL_global_ipv6(__attribute__((__unused
 
 	iface_init(NULL);
 
-	check_one_iface_one_global_ipv6(addrs->ifa_name);
+	check_one_iface_one_link_local_ipv6(addrs->ifa_name);
 }
 
 /*
- * Test that IPv6 addresses of higher preference do not get overwritten by addresses with lower one.
- * null < link local < site local < unique local < global
+ * Test that IPv6 addresses of lower preference get overwritten by addresses with higher one.
+ * null < global < unique local < site local < link local
  * One interface, only IPv6.
  */
 static void test_iface_init_one_ifc_global_UL_SL_LL_ipv6(__attribute__((__unused__)) void **state)
@@ -342,13 +344,62 @@ static void test_iface_init_one_ifc_global_UL_SL_LL_ipv6(__attribute__((__unused
 
 	iface_init(NULL);
 
-	check_one_iface_one_global_ipv6(addrs->ifa_name);
+	check_one_iface_one_link_local_ipv6(addrs->ifa_name);
+}
+
+/*
+ * Test that the first link local IPv6 addresseis kept as prefered over all other ones.
+ * One interface, only IPv6.
+ */
+static void test_iface_init_one_ifc_global_G_SL_LL_UL_G2_LL2_ipv6(__attribute__((__unused__)) void **state)
+{
+	struct ifaddrs addrs[] = {
+		{
+			addrs + 1,
+			"if0GULSLLLip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
+			(struct sockaddr*)&ipv6_global, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		},
+		{
+			addrs + 2,
+			"if0GULSLLLip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
+			(struct sockaddr*)&ipv6_site_local, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		},
+		{
+			addrs + 3,
+			"if0GULSLLLip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
+			(struct sockaddr*)&ipv6_link_local, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		},
+		{
+			addrs + 4,
+			"if0GULSLLLip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
+			(struct sockaddr*)&ipv6_unique_local, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		},
+		{
+			addrs + 5,
+			"if0GULSLLLip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
+			(struct sockaddr*)&ipv6_global_2, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		},
+		{
+			NULL,
+			"if0GULSLLLip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
+			(struct sockaddr*)&ipv6_link_local_2, (struct sockaddr*)&ipv6_FF, NULL, NULL
+		},
+	};
+
+	will_return(__wrap_getifaddrs, addrs);
+	will_return(__wrap_getifaddrs, 0);
+
+	iface_init(NULL);
+
+	check_one_iface_one_link_local_ipv6(addrs->ifa_name);
 }
 
 
 
+
+
 /* Helper function testing that one IPv4 and one IPv6 is set on one interface. */
-static void check_one_iface_global_ipv4_ipv6(char* ifname)
+static void check_one_iface_global_ipv4_link_local_ipv6(char* ifname)
 {
 	struct iface *iface = iface_iterator(1);
 	assert_non_null(iface);
@@ -360,7 +411,7 @@ static void check_one_iface_global_ipv4_ipv6(char* ifname)
 
 	assert_int_equal(ipv4_10_0_20_1.sin_addr.s_addr, iface->inaddr.s_addr);
 	assert_int_equal(0x00000000, iface->inaddr_old.s_addr);
-	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global.sin6_addr, &iface->in6addr));
+	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_link_local.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
 	assert_int_equal(-1, iface->sd4);
@@ -404,7 +455,7 @@ static void test_iface_init_one_ifc_ipv4_ll_global_ipv6(__attribute__((__unused_
 
 	iface_init(NULL);
 
-	check_one_iface_global_ipv4_ipv6(addrs->ifa_name);
+	check_one_iface_global_ipv4_link_local_ipv6(addrs->ifa_name);
 }
 
 
@@ -515,6 +566,7 @@ int main(void)
 		cmocka_unit_test_teardown(test_iface_init_one_ifc_LL_ipv6_global_ipv6, teardown),
 		cmocka_unit_test_teardown(test_iface_init_one_ifc_LL_SL_UL_global_ipv6, teardown),
 		cmocka_unit_test_teardown(test_iface_init_one_ifc_global_UL_SL_LL_ipv6, teardown),
+		cmocka_unit_test_teardown(test_iface_init_one_ifc_global_G_SL_LL_UL_G2_LL2_ipv6, teardown),
 
 		cmocka_unit_test_teardown(test_iface_init_one_ifc_ipv4_ll_global_ipv6, teardown),
 	};

@@ -200,12 +200,12 @@ void iface_init(char *ifname)
 		} else {
 			if (! IN6_ARE_ADDR_EQUAL(&iface->in6addr, &ina)) {
 				if (IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr)    /* Everything is better than no address (::) */
-					/* Any address is preferred over link local address */
-					|| IN6_IS_ADDR_LINKLOCAL(&iface->in6addr)
-					/* Any address is preferred over a site local address except for a link local address. */
-					|| (IN6_IS_ADDR_SITELOCAL(&iface->in6addr) && !IN6_IS_ADDR_LINKLOCAL(&ina))
-					/* A unique local address shall only be overwritten by a global address. */
-					|| ((iface->in6addr.s6_addr[0] & 0xfe) == 0xfc && !IN6_IS_ADDR_SITELOCAL(&ina) && !IN6_IS_ADDR_LINKLOCAL(&ina))
+					/* Any address is preferred over global address */
+					|| (!IN6_IS_ADDR_LINKLOCAL(&iface->in6addr) && (iface->in6addr.s6_addr[0] & 0xfe) != 0xfc && !IN6_IS_ADDR_SITELOCAL(&iface->in6addr))
+					/* A link local or site local address is preferred over a unique global address. */
+					|| ((iface->in6addr.s6_addr[0] & 0xfe) == 0xfc && (IN6_IS_ADDR_SITELOCAL(&ina) || IN6_IS_ADDR_LINKLOCAL(&ina)))
+					/* A link local address is preferred over a site local address. */
+					|| (IN6_IS_ADDR_SITELOCAL(&iface->in6addr) && IN6_IS_ADDR_LINKLOCAL(&ina))
 					) {
 					iface->in6addr = ina;
 					iface->changed = 1;
