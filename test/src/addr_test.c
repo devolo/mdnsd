@@ -483,7 +483,7 @@ static void test_iface_init_two_ifc_ipv4_ll_global_ipv6_ipv4_ipv6(__attribute__(
 		{
 			addrs + 4,
 			"if0c3ip4llgip6", IFF_UP | IFF_BROADCAST | IFF_MULTICAST,
-			(struct sockaddr*)&ipv6_link_local, (struct sockaddr*)&ipv6_FF, NULL, NULL
+			(struct sockaddr*)&ipv6_global, (struct sockaddr*)&ipv6_FF, NULL, NULL
 		},
 		{
 			NULL,
@@ -498,7 +498,6 @@ static void test_iface_init_two_ifc_ipv4_ll_global_ipv6_ipv4_ipv6(__attribute__(
 
 	iface_init(NULL);
 
-	check_one_iface_global_ipv4_ipv6(addrs->ifa_name);
 	struct iface *iface = iface_iterator(1);
 	assert_non_null(iface);
 
@@ -509,7 +508,7 @@ static void test_iface_init_two_ifc_ipv4_ll_global_ipv6_ipv4_ipv6(__attribute__(
 
 	assert_int_equal(ipv4_10_0_20_1.sin_addr.s_addr, iface->inaddr.s_addr);
 	assert_int_equal(0x00000000, iface->inaddr_old.s_addr);
-	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_global.sin6_addr, &iface->in6addr));
+	assert_true(IN6_ARE_ADDR_EQUAL(&ipv6_link_local.sin6_addr, &iface->in6addr));
 	assert_true(IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr_old));
 
 	assert_int_equal(-1, iface->sd4);
@@ -569,6 +568,7 @@ int main(void)
 		cmocka_unit_test_teardown(test_iface_init_one_ifc_global_G_SL_LL_UL_G2_LL2_ipv6, teardown),
 
 		cmocka_unit_test_teardown(test_iface_init_one_ifc_ipv4_ll_global_ipv6, teardown),
+		cmocka_unit_test_teardown(test_iface_init_two_ifc_ipv4_ll_global_ipv6_ipv4_ipv6, teardown),
 	};
 
 	return cmocka_run_group_tests(tests, NULL, NULL);
