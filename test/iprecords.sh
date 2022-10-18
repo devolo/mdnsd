@@ -12,7 +12,7 @@ mdnsd
 print "Starting mquery to query for A records ..."
 mquery -s -t 1 test.local. >"$DIR/result" || FAIL "Not found"
 # shellcheck disable=SC2154
-grep -q "A test.local. .* $server_addr" "$DIR/result" || FAIL
+grep -q "A test.local. .* $server_addr" "$DIR/result" || FAIL "Expected A record not found: $server_addr"
 
 mdnsd_stop
 
@@ -25,12 +25,13 @@ mdnsd
 print "Starting mquery to query for A records ..."
 mquery -s -t 1 test.local. >"$DIR/result" || FAIL "Not found"
 # shellcheck disable=SC2154
-grep -q "A test.local. .* $server_addr" "$DIR/result" || FAIL
+grep -q "A test.local. .* $server_addr" "$DIR/result" || FAIL "Expected A record not found: '$server_addr'"
 
 print "Starting mquery to query for AAAA records ..."
 mquery -s -t 28 test.local. >"$DIR/result" || FAIL "Not found"
 # shellcheck disable=SC2154
-grep -q "AAAA test.local. .* $server_addr_6" "$DIR/result" || FAIL
+cat "$DIR/result"
+grep -q "AAAA test.local. .* $server_addr_ll6" "$DIR/result" || FAIL "Expected AAAA record not found: '$server_addr_ll6'"
 
 
 
@@ -45,7 +46,7 @@ stop_collect
 if [ -f "$DIR/pcap" ] ; then
 	response=$(tshark -r "$DIR/pcap" -Y mdns -T fields -e dns.resp.ttl -e dns.aaaa 2>&1 | grep -v "root")
 	[ -n "$response" ] || FAIL "No mDNS goodbye packets found"
-	[ "${response}" = "0,0	${server_addr_6},${server_addr_6}" ] || FAIL "mDNS packets did not match goodbye packet requirements"
+	[ "${response}" = "0,0	${server_addr_ll6},${server_addr_ll6}" ] || FAIL "mDNS packets did not match goodbye packet requirements"
 
 else
 	echo "Unable to verify goodbye packets being sent"
@@ -57,10 +58,10 @@ fi
 print "Starting mquery to query for A records ..."
 mquery -s -t 1 test.local. >"$DIR/result" || FAIL "Not found"
 # shellcheck disable=SC2154
-grep -q "A test.local. .* $server_addr" "$DIR/result" || FAIL
+grep -q "A test.local. .* $server_addr" "$DIR/result" || FAIL "Expected A record not found: '$server_addr'"
 
 print "Starting mquery to query for AAAA records ..."
-mquery -s -t 28 test.local. >"$DIR/result" || FAIL
+mquery -s -t 28 test.local. >"$DIR/result" || FAIL "mquery faild $?"
 # shellcheck disable=SC2154
 grep -q "AAAA test.local. " "$DIR/result" && FAIL "No AAAA records should be sent anymore"
 
