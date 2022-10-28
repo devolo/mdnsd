@@ -73,6 +73,30 @@ struct iface *iface_find(const char *ifname)
 	return NULL;
 }
 
+struct iface *iface_find_by_addr(struct sockaddr *from)
+{
+	struct iface *iface;
+
+
+	for (iface = iface_iterator(1); iface; iface = iface_iterator(0)) {
+		if (from->sa_family == AF_INET6) {
+			if (! IN6_IS_ADDR_UNSPECIFIED(&iface->in6addr) &&
+				IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6*)from)->sin6_addr, &iface->in6addr)) {
+				return iface;
+			}
+		} else if (from->sa_family == AF_INET) {
+			if (iface->inaddr.s_addr != 0 &&
+				((struct sockaddr_in*)from)->sin_addr.s_addr == iface->inaddr.s_addr) {
+				return iface;
+			}
+		} else {
+			return NULL;
+		}
+	}
+
+	return NULL;
+}
+
 void iface_free(struct iface *iface)
 {
 	if (!iface)

@@ -60,7 +60,16 @@ int   ttl         = 255;
 
 void mdnsd_conflict(char *name, int type, struct sockaddr *from, socklen_t addrlen, void *arg)
 {
+	struct iface *iface_from;
 	struct iface *iface = (struct iface *)arg;
+
+	iface_from = iface_find_by_addr(from);
+	if (iface_from != NULL && ! iface_from->unused) {
+		/* The record came from the local host, so this is not considered a conflict.
+		   For simplicity, this does not check if the interface has an active mdnsd
+		   instance serving the record under the repsective address. */
+		return;
+	}
 
 	WARN("%s: conflicting name detected %s for type %d, reloading config ...", iface->ifname, name, type);
 	if (!reload) {

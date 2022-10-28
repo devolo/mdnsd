@@ -81,6 +81,7 @@ void mdnsd_conflict(char *name, int type, struct sockaddr *from, socklen_t addrl
 /* addr.c */
 struct iface *iface_iterator(int first);
 struct iface *iface_find(const char *ifname);
+struct iface *iface_find_by_addr(struct sockaddr *from);
 void          iface_free(struct iface *iface);
 void          iface_init(char *ifname);
 void          iface_exit(void);
