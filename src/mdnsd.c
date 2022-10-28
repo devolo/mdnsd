@@ -58,7 +58,7 @@ int   logging     = 1;
 int   ttl         = 255;
 
 
-void mdnsd_conflict(char *name, int type, void *arg)
+void mdnsd_conflict(char *name, int type, struct sockaddr *from, socklen_t addrlen, void *arg)
 {
 	struct iface *iface = (struct iface *)arg;
 

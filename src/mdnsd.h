@@ -76,7 +76,7 @@ struct iface {
 	int                hostid;           /* init to 1, +1 on conflict  */
 };
 
-void mdnsd_conflict(char *name, int type, void *arg);
+void mdnsd_conflict(char *name, int type, struct sockaddr *from, socklen_t addrlen, void *arg);
 
 /* addr.c */
 struct iface *iface_iterator(int first);

@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <errno.h>
+#include <arpa/inet.h>
 
 #define SPRIME 109		/* Size of query/publish hashes */
 #define LPRIME 1009		/* Size of cache hash */
@@ -92,7 +93,7 @@ struct mdns_record {
 	char unique;		/* # of checks performed to ensure */
 	int modified;		/* Ignore conflicts after update at runtime */
 	int tries;
-	void (*conflict)(char *, int, void *);
+	conflict_callback_t conflict;
 	void *arg;
 	struct timeval last_sent;
 	struct mdns_record *next, *list;
@@ -466,9 +467,24 @@ static void _q_answer(mdns_daemon_t *d, struct cached *c)
 		_q_done(d, c->q);
 }
 
-static void _conflict(mdns_daemon_t *d, mdns_record_t *r)
+static void _conflict(mdns_daemon_t *d, mdns_record_t *r, const struct sockaddr46 *from)
 {
-	r->conflict(r->rr.name, r->rr.type, r->arg);
+	socklen_t sasize = 0;
+	struct sockaddr_storage sa = {0};
+
+	if (from && from->family == AF_INET6) {
+		sa.ss_family = from->family;
+		((struct sockaddr_in6*)&sa)->sin6_addr = from->sin6_addr;
+		((struct sockaddr_in6*)&sa)->sin6_port = from->port;
+		sasize = sizeof(struct sockaddr_in6);
+	} else if (from) {
+		sa.ss_family = from->family;
+		((struct sockaddr_in*)&sa)->sin_addr = from->sin_addr;
+		((struct sockaddr_in*)&sa)->sin_port = from->port;
+		sasize = sizeof(struct sockaddr_in);
+	}
+
+	r->conflict(r->rr.name, r->rr.type, (struct sockaddr*)&sa, sasize, r->arg);
 	mdnsd_done(d, r);
 }
 
@@ -938,7 +954,7 @@ int mdnsd_in(mdns_daemon_t *d, struct message *m, const struct sockaddr_storage 
 
 						/* This answer isn't ours, conflict! */
 						if (!_a_match(&m->an[j], &r->rr)) {
-							_conflict(d, r);
+							_conflict(d, r, &from);
 							has_conflict = true;
 							break;
 						}
@@ -992,7 +1008,7 @@ int mdnsd_in(mdns_daemon_t *d, struct message *m, const struct sockaddr_storage 
 			if ((from.family == AF_INET && from.sin_addr.s_addr == d->addr.s_addr) ||
 				(from.family == AF_INET6 && IN6_ARE_ADDR_EQUAL(&(from.sin6_addr), &(d->addr_v6))) )
 				continue;
-			_conflict(d, r);
+			_conflict(d, r, &from);
 		}
 
 		if (d->received_callback)
@@ -1397,7 +1413,7 @@ mdns_record_t *mdnsd_shared(mdns_daemon_t *d, const char *host, unsigned short t
 }
 
 mdns_record_t *mdnsd_unique(mdns_daemon_t *d, const char *host, unsigned short type, unsigned long ttl,
-			    void (*conflict)(char *host, int type, void *arg), void *arg)
+				conflict_callback_t conflict, void *arg)
 {
 	mdns_record_t *r;
 

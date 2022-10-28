@@ -211,6 +211,20 @@ const mdns_answer_t *mdnsd_record_data(const mdns_record_t *r);
  */
 
 /**
+ * Callback to be called when a conflict with a unique records is
+ * detected. This defines the call back function pointer type.
+ *
+ * @param name     Owner name, name field of the conflicting record
+ * @param type     RR type of the conflicting record
+ * @param from     The source address, from which the conflicting record
+ *                 was received.
+ * @param addrlen  The size of the source address sockaddr structure.
+ * @param arg      A context pointer that was provided when the callback was set,
+ *                 which is returned in the callback call.
+ */
+typedef  void (*conflict_callback_t)(char *name, int type, struct sockaddr *from, socklen_t addrlen, void *arg);
+
+/**
  * Create a new unique record
  *
  * Call mdnsd_list() first to make sure the record is not used yet.
@@ -220,7 +234,7 @@ const mdns_answer_t *mdnsd_record_data(const mdns_record_t *r);
  * changes effectively expire the old one and attempt to create a new
  * unique record
  */
-mdns_record_t *mdnsd_unique(mdns_daemon_t *d, const char *host, unsigned short type, unsigned long ttl, void (*conflict)(char *host, int type, void *arg), void *arg);
+mdns_record_t *mdnsd_unique(mdns_daemon_t *d, const char *host, unsigned short type, unsigned long ttl, conflict_callback_t conflict, void *arg);
 
 
 /** 
